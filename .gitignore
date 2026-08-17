@@ -9,6 +9,16 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 
+# Terraform local state and inputs
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+
 # Node
 node_modules/
 .next/
