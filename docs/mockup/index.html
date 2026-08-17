@@ -1,0 +1,871 @@
+<title>Hindsight — counterfactual replay for agent swarms</title>
+
+<style>
+  :root {
+    --ground:   #f6f7f9;
+    --surface:  #ffffff;
+    --sunken:   #eceef2;
+    --line:     #d9dde4;
+    --line-soft:#e7eaef;
+    --ink:      #161a21;
+    --ink-2:    #4a5261;
+    --muted:    #79818f;
+    --run-a:    #c0761f;
+    --run-a-dim:#f0e2cd;
+    --run-b:    #3f7fb8;
+    --run-b-dim:#d8e6f2;
+    --good:     #3d8a5c;
+    --bad:      #c04d44;
+    --tape:     #7c6bb0;
+    --shadow:   0 1px 2px rgba(20,26,36,.06), 0 8px 24px -12px rgba(20,26,36,.18);
+
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:   #0e1116;
+      --surface:  #161a21;
+      --sunken:   #10141a;
+      --line:     #2a313c;
+      --line-soft:#212832;
+      --ink:      #e4e8ef;
+      --ink-2:    #a8b1bf;
+      --muted:    #737d8c;
+      --run-a:    #e0964a;
+      --run-a-dim:#3a2e1d;
+      --run-b:    #62a3da;
+      --run-b-dim:#1c2b3a;
+      --good:     #5fb383;
+      --bad:      #d9645a;
+      --tape:     #9a8ad0;
+      --shadow:   0 1px 2px rgba(0,0,0,.4), 0 12px 32px -16px rgba(0,0,0,.7);
+    }
+  }
+
+  :root[data-theme="light"] {
+    --ground:#f6f7f9; --surface:#ffffff; --sunken:#eceef2; --line:#d9dde4;
+    --line-soft:#e7eaef; --ink:#161a21; --ink-2:#4a5261; --muted:#79818f;
+    --run-a:#c0761f; --run-a-dim:#f0e2cd; --run-b:#3f7fb8; --run-b-dim:#d8e6f2;
+    --good:#3d8a5c; --bad:#c04d44; --tape:#7c6bb0;
+    --shadow:0 1px 2px rgba(20,26,36,.06), 0 8px 24px -12px rgba(20,26,36,.18);
+  }
+  :root[data-theme="dark"] {
+    --ground:#0e1116; --surface:#161a21; --sunken:#10141a; --line:#2a313c;
+    --line-soft:#212832; --ink:#e4e8ef; --ink-2:#a8b1bf; --muted:#737d8c;
+    --run-a:#e0964a; --run-a-dim:#3a2e1d; --run-b:#62a3da; --run-b-dim:#1c2b3a;
+    --good:#5fb383; --bad:#d9645a; --tape:#9a8ad0;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 32px -16px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 22px 72px; }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px;
+    padding-bottom: 18px; margin-bottom: 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: baseline; gap: 9px; }
+  .brand h1 {
+    font-family: var(--mono);
+    font-size: 20px; font-weight: 600; letter-spacing: -.02em;
+    margin: 0;
+  }
+  .mark {
+    font-family: var(--mono); font-size: 15px; color: var(--run-a);
+  }
+  .tagline { margin: 0; color: var(--muted); font-size: 14px; }
+  .demo-flag {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 3px;
+    padding: 3px 8px; white-space: nowrap;
+  }
+
+  /* ---------- shell ---------- */
+  .shell { display: grid; grid-template-columns: 268px minmax(0,1fr); gap: 22px; }
+  @media (max-width: 900px) { .shell { grid-template-columns: 1fr; } }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted);
+    margin: 0 0 10px;
+  }
+
+  /* ---------- case rail ---------- */
+  .rail { display: flex; flex-direction: column; gap: 8px; }
+  .case {
+    display: block; width: 100%; text-align: left;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--line); border-left: 3px solid var(--line);
+    border-radius: 4px; padding: 11px 13px;
+    font: inherit; cursor: pointer;
+    transition: border-color .14s, background .14s;
+  }
+  .case:hover { border-color: var(--ink-2); }
+  .case[aria-pressed="true"] { border-left-color: var(--run-a); background: var(--surface); box-shadow: var(--shadow); }
+  .case:focus-visible { outline: 2px solid var(--run-b); outline-offset: 2px; }
+  .case .ct { font-weight: 550; font-size: 14px; margin-bottom: 3px; }
+  .case .cs { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+  .case .cm {
+    display: flex; gap: 10px; margin-top: 8px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .verdict-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; vertical-align: middle; }
+  .v-found { background: var(--good); }
+  .v-missed { background: var(--bad); }
+
+  /* ---------- stage ---------- */
+  .stage { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 5px; box-shadow: var(--shadow);
+  }
+  .casehead { padding: 15px 18px; display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; }
+  .casehead h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+  .casehead .sub { color: var(--muted); font-size: 13.5px; font-family: var(--mono); }
+
+  .runtag {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 3px;
+    margin-left: auto;
+  }
+  .tag-a { color: var(--run-a); background: var(--run-a-dim); }
+  .tag-b { color: var(--run-b); background: var(--run-b-dim); }
+
+  /* ---------- board ---------- */
+  .board { padding: 6px 8px 0; overflow-x: auto; }
+  svg.graph { display: block; width: 100%; min-width: 660px; height: auto; }
+
+  .lane-label {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
+    text-transform: uppercase; fill: var(--muted);
+  }
+  .lane-rule { stroke: var(--line-soft); stroke-width: 1; }
+  .hub-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; fill: var(--muted); text-transform: uppercase; }
+  .edge { fill: none; stroke: var(--line); stroke-width: 1.25; opacity: 0; transition: opacity .3s; }
+  .edge.on { opacity: .75; }
+  .edge.carry { stroke: var(--accent); stroke-width: 1.75; opacity: .9; }
+
+  .node circle { transition: fill .25s, stroke .25s, r .2s, opacity .25s; }
+  .node text {
+    font-family: var(--mono); font-size: 9px; fill: var(--surface);
+    text-anchor: middle; dominant-baseline: central; pointer-events: none;
+  }
+  .hub { fill: var(--sunken); stroke: var(--line); stroke-width: 1.5; }
+  .hub.live { fill: var(--accent); stroke: var(--accent); }
+  .hub-txt { font-family: var(--mono); font-size: 10px; text-anchor: middle; dominant-baseline: central; fill: var(--ink-2); font-weight: 600; }
+  .hub.live + .hub-txt { fill: var(--surface); }
+
+  .ag-pending { fill: var(--sunken); stroke: var(--line); stroke-width: 1.25; }
+  .ag-working { fill: var(--accent); stroke: var(--accent); stroke-width: 1.25; }
+  .ag-quiet   { fill: var(--sunken); stroke: var(--line); stroke-width: 1.25; opacity: .5; }
+  .ag-hit     { fill: var(--good);   stroke: var(--good); stroke-width: 1.25; }
+  .ag-dead    { fill: none; stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 2.5 2.5; }
+
+  .pulse { animation: pulse 1.5s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+
+  .tape-ring { fill: none; stroke: var(--tape); stroke-width: 1.25; stroke-dasharray: 3 3; opacity: 0; transition: opacity .25s; }
+  .tape-ring.on { opacity: .9; }
+
+  .skull { font-family: var(--mono); font-size: 11px; fill: var(--bad); text-anchor: middle; dominant-baseline: central; }
+
+  /* ---------- transport ---------- */
+  .transport {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 11px 18px 13px; border-top: 1px solid var(--line-soft);
+  }
+  .btn {
+    font-family: var(--mono); font-size: 12px;
+    background: var(--sunken); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 4px;
+    padding: 6px 13px; cursor: pointer;
+    transition: border-color .14s, background .14s;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--ink-2); }
+  .btn:focus-visible { outline: 2px solid var(--run-b); outline-offset: 2px; }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .btn.primary { background: var(--run-b); border-color: var(--run-b); color: #fff; }
+  .btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+
+  .scrub { flex: 1 1 200px; min-width: 140px; accent-color: var(--accent); }
+
+  .readout {
+    display: flex; gap: 16px; font-family: var(--mono); font-size: 12px;
+    font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap;
+  }
+  .readout b { font-weight: 600; color: var(--ink); }
+
+  /* ---------- verdict ---------- */
+  .verdict {
+    margin: 0 18px 16px; padding: 11px 14px; border-radius: 4px;
+    border: 1px solid var(--line); background: var(--sunken);
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
+    display: flex; gap: 10px; align-items: flex-start;
+    opacity: 0; transition: opacity .4s;
+  }
+  .verdict.on { opacity: 1; }
+  .verdict .lbl { color: var(--muted); text-transform: uppercase; font-size: 10.5px; letter-spacing: .09em; padding-top: 2px; }
+  .verdict.found { border-left: 3px solid var(--good); }
+  .verdict.missed { border-left: 3px solid var(--bad); }
+
+  /* ---------- fork ---------- */
+  .fork { padding: 15px 18px 17px; }
+  .fork h3 { margin: 0 0 3px; font-size: 14px; font-weight: 600; }
+  .fork .hint { margin: 0 0 14px; color: var(--muted); font-size: 13px; max-width: 62ch; }
+  .allocs { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px,1fr)); gap: 10px; margin-bottom: 14px; }
+  .alloc {
+    border: 1px solid var(--line); border-radius: 4px; padding: 9px 11px; background: var(--sunken);
+  }
+  .alloc .an {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 7px;
+  }
+  .stepper { display: flex; align-items: center; gap: 9px; }
+  .stepper button {
+    width: 24px; height: 24px; flex: none; border-radius: 3px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    font-family: var(--mono); font-size: 14px; line-height: 1; cursor: pointer; padding: 0;
+  }
+  .stepper button:hover:not(:disabled) { border-color: var(--ink-2); }
+  .stepper button:disabled { opacity: .35; cursor: default; }
+  .stepper button:focus-visible { outline: 2px solid var(--run-b); outline-offset: 1px; }
+  .stepper .val {
+    font-family: var(--mono); font-size: 16px; font-variant-numeric: tabular-nums;
+    min-width: 16px; text-align: center; font-weight: 600;
+  }
+  .stepper .delta { font-family: var(--mono); font-size: 11px; color: var(--run-b); min-width: 22px; }
+  .fork-actions { display: flex; align-items: center; gap: 13px; flex-wrap: wrap; }
+  .fork-actions .note { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+
+  /* ---------- diff ---------- */
+  .diff { padding: 15px 18px 18px; display: none; }
+  .diff.on { display: block; }
+  .diff h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+  table.cmp { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  table.cmp th, table.cmp td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+  table.cmp th {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); font-weight: 500;
+  }
+  table.cmp td:first-child { color: var(--ink-2); }
+  table.cmp .col-a, table.cmp .col-b { font-family: var(--mono); font-weight: 600; }
+  table.cmp .col-a { color: var(--run-a); }
+  table.cmp .col-b { color: var(--run-b); }
+  table.cmp th.col-a { color: var(--run-a); font-weight: 600; }
+  table.cmp th.col-b { color: var(--run-b); font-weight: 600; }
+  .swing { font-family: var(--mono); font-size: 12px; }
+  .worse { color: var(--bad); }
+  .better { color: var(--good); }
+  .same { color: var(--muted); }
+
+  .tapebox {
+    margin-top: 14px; padding: 11px 13px; border-radius: 4px;
+    border: 1px solid var(--line); border-left: 3px solid var(--tape);
+    background: var(--sunken); font-size: 13px; line-height: 1.55;
+  }
+  .tapebox .th {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--tape); margin-bottom: 5px;
+  }
+  .tapebox code {
+    font-family: var(--mono); font-size: 12px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px;
+  }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 10px 18px 14px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    border-top: 1px solid var(--line-soft);
+  }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .sw { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+
+  .footnote {
+    margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 13px; max-width: 70ch;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="brand"><span class="mark">◉</span><h1>Hindsight</h1></div>
+    <p class="tagline">Change one decision an agent swarm made. Watch what happens instead.</p>
+    <span class="demo-flag">Mockup · simulated data</span>
+  </header>
+
+  <div class="shell">
+    <aside>
+      <p class="eyebrow">Recorded incidents</p>
+      <div class="rail" id="rail"></div>
+    </aside>
+
+    <main class="stage">
+      <section class="panel">
+        <div class="casehead">
+          <h2 id="caseTitle">—</h2>
+          <span class="sub" id="caseSub"></span>
+          <span class="runtag tag-a" id="runTag">Original run</span>
+        </div>
+
+        <div class="board">
+          <svg class="graph" id="graph" viewBox="0 0 900 330" role="img"
+               aria-label="Agent swarm investigating a cluster incident"></svg>
+        </div>
+
+        <div class="transport">
+          <button class="btn" id="playBtn">▶ Play</button>
+          <input class="scrub" id="scrub" type="range" min="0" max="1000" value="0" aria-label="Scrub through the run" />
+          <div class="readout">
+            <span>t <b id="roTime">0s</b></span>
+            <span>agents <b id="roAgents">0</b></span>
+            <span>spend <b id="roCost">$0.00</b></span>
+          </div>
+        </div>
+
+        <div class="legend">
+          <span><i class="sw" style="background:var(--run-a)"></i>working</span>
+          <span><i class="sw" style="background:var(--good)"></i>found evidence</span>
+          <span><i class="sw" style="background:var(--sunken);border:1px solid var(--line)"></i>nothing here</span>
+          <span><i class="sw" style="border:1.5px dashed var(--bad)"></i>pod killed</span>
+          <span><i class="sw" style="border:1.5px dashed var(--tape)"></i>replayed from tape</span>
+        </div>
+
+        <div class="verdict" id="verdict"></div>
+      </section>
+
+      <section class="panel fork">
+        <h3>Change the planner's mind</h3>
+        <p class="hint">The planner decided how many agents to send where. That was a choice — here it is,
+          editable. Re-run it and the swarm investigates the same incident with a different allocation.</p>
+        <div class="allocs" id="allocs"></div>
+        <div class="fork-actions">
+          <button class="btn primary" id="rerunBtn" disabled>Re-run counterfactual</button>
+          <button class="btn" id="resetBtn">Reset to original</button>
+          <span class="note" id="forkNote">Adjust an allocation to enable re-run</span>
+        </div>
+      </section>
+
+      <section class="panel diff" id="diff">
+        <h3>Original vs. counterfactual</h3>
+        <div style="overflow-x:auto">
+          <table class="cmp">
+            <thead>
+              <tr><th>Measure</th><th class="col-a">Original</th><th class="col-b">Counterfactual</th><th>Swing</th></tr>
+            </thead>
+            <tbody id="cmpBody"></tbody>
+          </table>
+        </div>
+        <div class="tapebox" id="tapebox"></div>
+      </section>
+    </main>
+  </div>
+
+  <p class="footnote">
+    This is a feel-demo, not the product: the cluster, the agents and the numbers are simulated in your
+    browser so the interaction can be judged before anything is built. In the real thing the swarm runs
+    on Kubernetes, the faults are injected on purpose, and the tape is a recording of actual model and
+    tool calls.
+  </p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var DOMAINS = [
+    { id: "db",      label: "Database", y:  58 },
+    { id: "logs",    label: "Logs",     y: 132 },
+    { id: "deploys", label: "Deploys",  y: 206 },
+    { id: "net",     label: "Network",  y: 280 }
+  ];
+
+  // token-seconds → dollars, plus a fixed cost per agent and per orchestration
+  var RATE = 0.0009, AGENT_BASE = 0.012, ORCH = 0.05;
+
+  var CASES = [
+    {
+      id: "checkout",
+      title: "Checkout latency spike",
+      sub: "p99 on /checkout: 180ms → 4.2s",
+      blurb: "Connection pool exhaustion introduced by the 14:03 deploy",
+      truth: "db",
+      alloc: { db: 4, logs: 1, deploys: 1, net: 1 },
+      seed: 1337,
+      kill: 0.44
+    },
+    {
+      id: "evictions",
+      title: "Cascading pod evictions",
+      sub: "12 pods evicted across 3 nodes in 90s",
+      blurb: "A Helm values bump quietly lowered the memory limit",
+      truth: "deploys",
+      alloc: { db: 3, logs: 3, deploys: 0, net: 2 },
+      seed: 8821,
+      kill: 0.62
+    },
+    {
+      id: "leak",
+      title: "Memory leak, slow burn",
+      sub: "RSS climbing 40MB/hr on ingest workers",
+      blurb: "Unbounded retry buffer in the Kafka consumer",
+      truth: "logs",
+      alloc: { db: 1, logs: 2, deploys: 1, net: 1 },
+      seed: 404,
+      kill: null
+    }
+  ];
+
+  // deterministic PRNG — same allocation always produces the same run
+  function rngFrom(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function allocKey(a) { return a.db + "-" + a.logs + "-" + a.deploys + "-" + a.net; }
+  function total(a) { return a.db + a.logs + a.deploys + a.net; }
+
+  function simulate(kase, alloc) {
+    var rnd = rngFrom(kase.seed + alloc.db * 7 + alloc.logs * 13 + alloc.deploys * 29 + alloc.net * 53);
+    var agents = [];
+    var n = 0;
+
+    DOMAINS.forEach(function (d) {
+      var count = alloc[d.id];
+      for (var i = 0; i < count; i++) {
+        var onTruth = d.id === kase.truth;
+        var spawn = 5 + rnd() * 5;
+        var work = onTruth ? 34 + rnd() * 26 : 48 + rnd() * 58;
+        var herring = !onTruth && rnd() < 0.38;
+        if (herring) work += 55 + rnd() * 55;
+        agents.push({
+          id: n++, domain: d.id, y: d.y, idx: i, count: count,
+          spawn: spawn, report: spawn + work,
+          finds: onTruth, herring: herring,
+          dead: null, revive: null
+        });
+      }
+    });
+
+    if (!agents.length) {
+      return { agents: [], found: false, duration: 30, cost: 0, converge: 20,
+               herrings: 0, alloc: alloc, key: allocKey(alloc) };
+    }
+
+    var hits = agents.filter(function (a) { return a.finds; });
+    var found = hits.length > 0;
+    var lastReport = Math.max.apply(null, agents.map(function (a) { return a.report; }));
+    var firstHit = found ? Math.min.apply(null, hits.map(function (a) { return a.report; })) : 0;
+    var converge = found ? Math.max(firstHit + 14, lastReport * 0.62 + 14) : lastReport + 26;
+    var duration = converge + 20;
+
+    // one pod gets killed mid-investigation and rescheduled
+    if (kase.kill != null && agents.length > 2) {
+      var victim = agents[Math.floor(rnd() * agents.length)];
+      var at = converge * kase.kill;
+      if (at > victim.spawn + 4 && at < victim.report - 4) {
+        victim.dead = at;
+        victim.revive = at + 13;
+        victim.report += 15;
+        duration = Math.max(duration, victim.report + 8);
+      }
+    }
+
+    var cost = 0;
+    agents.forEach(function (a) {
+      var active = Math.max(0, a.report - a.spawn) - (a.dead != null ? 13 : 0);
+      cost += active * RATE + AGENT_BASE;
+    });
+    cost += ORCH; // planner + synthesis
+
+    return {
+      agents: agents, found: found, duration: duration, converge: converge,
+      cost: cost, alloc: alloc, key: allocKey(alloc),
+      herrings: agents.filter(function (a) { return a.herring; }).length
+    };
+  }
+
+  // ---------- geometry ----------
+  var PLANNER = { x: 96, y: 169 };
+  var SYNTH   = { x: 806, y: 169 };
+
+  function agentPos(a) {
+    var startX = 430 - (a.count - 1) * 29;
+    return { x: startX + a.idx * 58, y: a.y };
+  }
+  function curve(x1, y1, x2, y2) {
+    var mx = (x1 + x2) / 2;
+    return "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2;
+  }
+  function el(tag, attrs) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) { if (attrs.hasOwnProperty(k)) e.setAttribute(k, attrs[k]); }
+    return e;
+  }
+
+  // ---------- state ----------
+  var svg      = document.getElementById("graph");
+  var rail     = document.getElementById("rail");
+  var allocsEl = document.getElementById("allocs");
+
+  var kase = CASES[0];
+  var baseRun = null;   // the original
+  var run = null;       // whatever is on screen
+  var isCF = false;
+  var draft = null;
+  var t = 0, playing = false, raf = null, lastTs = 0;
+  var nodes = [];
+
+  // ---------- build the board ----------
+  function buildBoard(r) {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    nodes = [];
+
+    var accent = isCF ? "var(--run-b)" : "var(--run-a)";
+    svg.style.setProperty("--accent", accent);
+
+    DOMAINS.forEach(function (d) {
+      svg.appendChild(el("line", { x1: 176, y1: d.y, x2: 762, y2: d.y, class: "lane-rule" }));
+      var lb = el("text", { x: 176, y: d.y - 15, class: "lane-label" });
+      lb.textContent = d.label;
+      svg.appendChild(lb);
+    });
+
+    var edgeLayer = el("g", {});
+    svg.appendChild(edgeLayer);
+
+    // hubs
+    function hub(p, label, id) {
+      var g = el("g", {});
+      var c = el("circle", { cx: p.x, cy: p.y, r: 27, class: "hub", id: id });
+      var tx = el("text", { x: p.x, y: p.y, class: "hub-txt" });
+      tx.textContent = label;
+      g.appendChild(c); g.appendChild(tx);
+      svg.appendChild(g);
+      return c;
+    }
+    var plannerEl = hub(PLANNER, "PLAN", "planner");
+    var synthEl   = hub(SYNTH, "SYNTH", "synth");
+
+    var lbl1 = el("text", { x: PLANNER.x, y: PLANNER.y + 44, class: "hub-label", "text-anchor": "middle" });
+    lbl1.textContent = "planner";
+    svg.appendChild(lbl1);
+    var lbl2 = el("text", { x: SYNTH.x, y: SYNTH.y + 44, class: "hub-label", "text-anchor": "middle" });
+    lbl2.textContent = "synthesizer";
+    svg.appendChild(lbl2);
+
+    r.agents.forEach(function (a) {
+      var p = agentPos(a);
+      var eIn  = el("path", { d: curve(PLANNER.x + 27, PLANNER.y, p.x - 14, p.y), class: "edge" });
+      var eOut = el("path", { d: curve(p.x + 14, p.y, SYNTH.x - 27, SYNTH.y), class: "edge" });
+      edgeLayer.appendChild(eIn); edgeLayer.appendChild(eOut);
+
+      var g = el("g", { class: "node" });
+      var ring = el("circle", { cx: p.x, cy: p.y, r: 17, class: "tape-ring" });
+      var c = el("circle", { cx: p.x, cy: p.y, r: 12, class: "ag-pending" });
+      var skull = el("text", { x: p.x, y: p.y, class: "skull", opacity: 0 });
+      skull.textContent = "×";
+      g.appendChild(ring); g.appendChild(c); g.appendChild(skull);
+      svg.appendChild(g);
+
+      nodes.push({ a: a, c: c, ring: ring, skull: skull, eIn: eIn, eOut: eOut });
+    });
+
+    return { plannerEl: plannerEl, synthEl: synthEl };
+  }
+
+  var hubs = null;
+
+  // ---------- render a moment in time ----------
+  function render() {
+    var r = run;
+    var live = 0, spend = 0;
+
+    nodes.forEach(function (n) {
+      var a = n.a, c = n.c;
+      var isDead = a.dead != null && t >= a.dead && t < a.revive;
+      var started = t >= a.spawn;
+      var done = t >= a.report;
+
+      n.eIn.classList.toggle("on", started && !isDead);
+      n.eOut.classList.toggle("on", done);
+      n.eOut.classList.toggle("carry", done && a.finds);
+      n.skull.setAttribute("opacity", isDead ? 1 : 0);
+
+      var cls = "ag-pending";
+      if (isDead) { cls = "ag-dead"; }
+      else if (done) { cls = a.finds ? "ag-hit" : "ag-quiet"; }
+      else if (started) { cls = "ag-working"; live++; }
+
+      c.setAttribute("class", cls);
+      c.classList.toggle("pulse", !REDUCED && cls === "ag-working");
+      c.setAttribute("r", cls === "ag-hit" ? 13 : 12);
+
+      // tape ring: on a counterfactual, agents whose slot existed in the original replay from cache
+      var fromTape = isCF && baseRun && a.idx < baseRun.alloc[a.domain];
+      n.ring.classList.toggle("on", fromTape && started);
+
+      if (started) {
+        var end = Math.min(t, a.report);
+        spend += Math.max(0, end - a.spawn) * RATE + AGENT_BASE;
+      }
+    });
+
+    if (hubs) {
+      hubs.plannerEl.classList.toggle("live", t < 8);
+      hubs.synthEl.classList.toggle("live", t >= r.converge - 14 && t <= r.duration);
+    }
+    spend += t > 2 ? ORCH : 0;
+
+    document.getElementById("roTime").textContent = Math.round(t) + "s";
+    document.getElementById("roAgents").textContent = live;
+    document.getElementById("roCost").textContent = "$" + spend.toFixed(2);
+    document.getElementById("scrub").value = Math.round((t / r.duration) * 1000);
+
+    var v = document.getElementById("verdict");
+    if (t >= r.converge + 4) {
+      v.classList.add("on");
+      v.classList.toggle("found", r.found);
+      v.classList.toggle("missed", !r.found);
+      v.innerHTML = r.found
+        ? '<span class="lbl">Root&nbsp;cause</span><span><b>' + kase.blurb + '</b><br>' +
+          '<span style="color:var(--muted)">Correct — this is the fault we injected.</span></span>'
+        : '<span class="lbl">No&nbsp;verdict</span><span><b>Investigation closed without a root cause.</b><br>' +
+          '<span style="color:var(--muted)">Nobody was sent to <b>' +
+          DOMAINS.filter(function (d) { return d.id === kase.truth; })[0].label.toLowerCase() +
+          '</b>, where the fault actually was.</span></span>';
+    } else {
+      v.classList.remove("on");
+    }
+  }
+
+  // ---------- playback ----------
+  function tick(ts) {
+    if (!playing) return;
+    if (!lastTs) lastTs = ts;
+    var dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+    t += dt * 34;
+    if (t >= run.duration) { t = run.duration; stop(); }
+    render();
+    if (playing) raf = requestAnimationFrame(tick);
+  }
+  function play() {
+    if (t >= run.duration) t = 0;
+    playing = true; lastTs = 0;
+    document.getElementById("playBtn").textContent = "❚❚ Pause";
+    raf = requestAnimationFrame(tick);
+  }
+  function stop() {
+    playing = false;
+    if (raf) cancelAnimationFrame(raf);
+    document.getElementById("playBtn").textContent = t >= run.duration ? "↻ Replay" : "▶ Play";
+  }
+
+  // ---------- load ----------
+  function loadRun(r, counterfactual) {
+    isCF = counterfactual;
+    run = r;
+    t = 0;
+    hubs = buildBoard(r);
+    var tag = document.getElementById("runTag");
+    tag.textContent = counterfactual ? "Counterfactual" : "Original run";
+    tag.className = "runtag " + (counterfactual ? "tag-b" : "tag-a");
+    render();
+    if (REDUCED) { t = r.duration; render(); stop(); } else { play(); }
+  }
+
+  function selectCase(c) {
+    kase = c;
+    baseRun = simulate(c, c.alloc);
+    draft = { db: c.alloc.db, logs: c.alloc.logs, deploys: c.alloc.deploys, net: c.alloc.net };
+    document.getElementById("caseTitle").textContent = c.title;
+    document.getElementById("caseSub").textContent = c.sub;
+    document.getElementById("diff").classList.remove("on");
+    buildRail();
+    buildAllocs();
+    loadRun(baseRun, false);
+  }
+
+  // ---------- rail ----------
+  function buildRail() {
+    rail.innerHTML = "";
+    CASES.forEach(function (c) {
+      var r = simulate(c, c.alloc);
+      var b = document.createElement("button");
+      b.className = "case";
+      b.setAttribute("aria-pressed", c.id === kase.id ? "true" : "false");
+      b.innerHTML =
+        '<div class="ct">' + c.title + '</div>' +
+        '<div class="cs">' + c.sub + '</div>' +
+        '<div class="cm">' +
+          '<span>' + total(c.alloc) + ' agents</span>' +
+          '<span>' + fmtDur(r.duration) + '</span>' +
+          '<span>$' + r.cost.toFixed(2) + '</span>' +
+          '<span class="verdict-dot ' + (r.found ? "v-found" : "v-missed") + '"></span>' +
+        '</div>';
+      b.addEventListener("click", function () { selectCase(c); });
+      rail.appendChild(b);
+    });
+  }
+
+  function fmtDur(s) {
+    var m = Math.floor(s / 60), sec = Math.round(s % 60);
+    return m > 0 ? m + "m " + (sec < 10 ? "0" : "") + sec + "s" : sec + "s";
+  }
+
+  // ---------- allocation steppers ----------
+  function buildAllocs() {
+    allocsEl.innerHTML = "";
+    DOMAINS.forEach(function (d) {
+      var box = document.createElement("div");
+      box.className = "alloc";
+      var diff = draft[d.id] - kase.alloc[d.id];
+      box.innerHTML =
+        '<div class="an">' + d.label + (d.id === kase.truth ? '' : '') + '</div>' +
+        '<div class="stepper">' +
+          '<button type="button" data-op="-" aria-label="Fewer ' + d.label + ' agents">−</button>' +
+          '<span class="val">' + draft[d.id] + '</span>' +
+          '<button type="button" data-op="+" aria-label="More ' + d.label + ' agents">+</button>' +
+          '<span class="delta">' + (diff === 0 ? "" : (diff > 0 ? "+" + diff : diff)) + '</span>' +
+        '</div>';
+      var btns = box.querySelectorAll("button");
+      btns[0].disabled = draft[d.id] <= 0;
+      btns[1].disabled = draft[d.id] >= 6;
+      btns[0].addEventListener("click", function () { bump(d.id, -1); });
+      btns[1].addEventListener("click", function () { bump(d.id, 1); });
+      allocsEl.appendChild(box);
+    });
+    syncForkUI();
+  }
+
+  function bump(id, delta) {
+    draft[id] = Math.max(0, Math.min(6, draft[id] + delta));
+    buildAllocs();
+  }
+
+  function syncForkUI() {
+    var changed = allocKey(draft) !== allocKey(kase.alloc);
+    document.getElementById("rerunBtn").disabled = !changed;
+    document.getElementById("forkNote").textContent = changed
+      ? total(draft) + " agents (was " + total(kase.alloc) + ")"
+      : "Adjust an allocation to enable re-run";
+  }
+
+  // ---------- diff ----------
+  function showDiff(cf) {
+    var body = document.getElementById("cmpBody");
+    body.innerHTML = "";
+
+    function row(label, a, b, swing, cls) {
+      var tr = document.createElement("tr");
+      tr.innerHTML = '<td>' + label + '</td><td class="col-a">' + a + '</td>' +
+                     '<td class="col-b">' + b + '</td>' +
+                     '<td class="swing ' + cls + '">' + swing + '</td>';
+      body.appendChild(tr);
+    }
+
+    var foundSwing = baseRun.found === cf.found ? "unchanged"
+      : (cf.found ? "recovered" : "lost the bug");
+    row("Root cause found",
+        baseRun.found ? "yes" : "no", cf.found ? "yes" : "no",
+        foundSwing,
+        baseRun.found === cf.found ? "same" : (cf.found ? "better" : "worse"));
+
+    var dt = cf.duration - baseRun.duration;
+    row("Time to verdict", fmtDur(baseRun.duration), fmtDur(cf.duration),
+        Math.abs(dt) < 3 ? "—" : (dt > 0 ? "+" : "−") + fmtDur(Math.abs(dt)),
+        Math.abs(dt) < 3 ? "same" : (dt > 0 ? "worse" : "better"));
+
+    var dc = cf.cost - baseRun.cost;
+    row("Spend", "$" + baseRun.cost.toFixed(2), "$" + cf.cost.toFixed(2),
+        Math.abs(dc) < 0.02 ? "—" : (dc > 0 ? "+" : "−") + "$" + Math.abs(dc).toFixed(2),
+        Math.abs(dc) < 0.02 ? "same" : (dc > 0 ? "worse" : "better"));
+
+    var da = total(cf.alloc) - total(baseRun.alloc);
+    row("Agents dispatched", total(baseRun.alloc), total(cf.alloc),
+        da === 0 ? "—" : (da > 0 ? "+" : "−") + Math.abs(da), "same");
+
+    var dh = cf.herrings - baseRun.herrings;
+    row("Dead ends chased", baseRun.herrings, cf.herrings,
+        dh === 0 ? "—" : (dh > 0 ? "+" : "−") + Math.abs(dh),
+        dh === 0 ? "same" : (dh > 0 ? "worse" : "better"));
+
+    // tape accounting
+    var reused = 0, fresh = 0;
+    cf.agents.forEach(function (a) {
+      if (a.idx < baseRun.alloc[a.domain]) reused++; else fresh++;
+    });
+    var replayCost = fresh * 0.14 + 0.02;
+
+    document.getElementById("tapebox").innerHTML =
+      '<div class="th">What this re-run actually cost to produce</div>' +
+      '<b>' + reused + '</b> agent trajector' + (reused === 1 ? "y" : "ies") +
+      ' came straight off the tape — same inputs, so the recorded answers were replayed rather than ' +
+      're-executed. <b>' + fresh + '</b> stepped off the recorded path and had to run for real.<br>' +
+      'Billed for this counterfactual: <code>$' + replayCost.toFixed(2) + '</code> ' +
+      '(vs <code>$' + cf.cost.toFixed(2) + '</code> if every call were executed live).<br>' +
+      '<span style="color:var(--muted)">This is why the two runs are comparable at all: everything the ' +
+      'counterfactual shares with the original is <em>identical by construction</em>, not merely similar.</span>';
+
+    document.getElementById("diff").classList.add("on");
+  }
+
+  // ---------- wiring ----------
+  document.getElementById("playBtn").addEventListener("click", function () {
+    if (playing) stop(); else play();
+  });
+
+  document.getElementById("scrub").addEventListener("input", function (e) {
+    stop();
+    t = (e.target.value / 1000) * run.duration;
+    render();
+  });
+
+  document.getElementById("rerunBtn").addEventListener("click", function () {
+    var cf = simulate(kase, { db: draft.db, logs: draft.logs, deploys: draft.deploys, net: draft.net });
+    loadRun(cf, true);
+    showDiff(cf);
+    document.getElementById("diff").scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "nearest" });
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", function () {
+    draft = { db: kase.alloc.db, logs: kase.alloc.logs, deploys: kase.alloc.deploys, net: kase.alloc.net };
+    buildAllocs();
+    document.getElementById("diff").classList.remove("on");
+    loadRun(baseRun, false);
+  });
+
+  selectCase(CASES[0]);
+})();
+</script>

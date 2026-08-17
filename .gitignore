@@ -1,0 +1,26 @@
+# Recorded runs are generated. Fixtures live in fixtures/ and are tracked.
+runs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+out/
+playwright-report/
+test-results/
+
+# Local config and secrets
+.env
+.env.local
+config/local.toml
+.cost-ledger.json
+
+# macOS
+.DS_Store
