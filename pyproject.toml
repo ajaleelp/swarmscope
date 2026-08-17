@@ -3,16 +3,27 @@ name = "hindsight"
 version = "0.1.0"
 description = "Counterfactual replay for agent swarms"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "alembic>=1.16,<2",
+    "fastapi>=0.116,<1",
+    "psycopg[binary]>=3.2,<4",
+    "pydantic>=2.11,<3",
+    "pydantic-settings>=2.10,<3",
+    "sqlalchemy[asyncio]>=2.0,<3",
+    "uvicorn[standard]>=0.35,<1",
+]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28,<1",
     "pytest>=8.3,<9",
+    "pytest-asyncio>=1,<2",
     "ruff>=0.7,<1",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = [
     "cluster: requires a running local Kubernetes cluster",
     "spend: makes real model API calls",
