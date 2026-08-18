@@ -58,6 +58,12 @@ async def test_place_order_writes_order_and_outbox(
     assert event.event_version == 1
     assert event.correlation_id == correlation_id
     assert event.published_at is None
+    assert event.publish_attempts == 0
+    assert event.next_attempt_at is not None
+    assert event.lease_owner is None
+    assert event.lease_expires_at is None
+    assert event.last_attempt_at is None
+    assert event.last_publish_error is None
     assert event.payload == {
         "order_id": str(response.order_id),
         "customer_id": "customer-123",
