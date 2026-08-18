@@ -1,0 +1,16 @@
+# Copy this file to terraform.tfvars only after creating an Azure subscription.
+# Replace every placeholder before running terraform plan.
+
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# Example only. Choose the actual Azure region later.
+location = "replace-with-your-azure-region"
+
+# Must be globally unique across Azure, not just within your subscription.
+service_bus_namespace_name = "hindsight-dev-replace-me"
+
+# Your Microsoft Entra object ID, not your email address.
+developer_principal_id = "00000000-0000-0000-0000-000000000000"
+
+# Example documentation-only IP address. Replace with your own public IPv4 /32.
+allowed_ip_cidr = "203.0.113.10/32"
