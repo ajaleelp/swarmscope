@@ -94,9 +94,10 @@ semantics come first; the swarm and the tape follow.
 - [x] Outbox delivery state: attempts, scheduling, leases
 - [x] Outbox publisher: claim, publish, record, retry with backoff
 - [x] Terraform definition for the Azure Service Bus topology
-- [ ] Service Bus publisher using Microsoft Entra identity
-- [ ] Publisher process loop and entrypoint
-- [ ] Fulfilment worker with idempotent consumption
+- [x] Service Bus publisher using Microsoft Entra identity
+- [x] Publisher process loop with graceful shutdown
+- [x] Fulfilment schema: processed events and idempotency guards
+- [ ] Fulfilment consumer with idempotent handling
 - [ ] Load generator with repeatable traffic
 - [ ] Fault catalogue with recorded ground truth
 
