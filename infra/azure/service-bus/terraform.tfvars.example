@@ -7,7 +7,7 @@ subscription_id = "00000000-0000-0000-0000-000000000000"
 location = "replace-with-your-azure-region"
 
 # Must be globally unique across Azure, not just within your subscription.
-service_bus_namespace_name = "hindsight-dev-replace-me"
+service_bus_namespace_name = "swarmscope-dev-replace-me"
 
 # Your Microsoft Entra object ID, not your email address.
 developer_principal_id = "00000000-0000-0000-0000-000000000000"

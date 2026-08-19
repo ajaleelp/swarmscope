@@ -1,5 +1,5 @@
 [project]
-name = "hindsight"
+name = "swarmscope"
 version = "0.1.0"
 description = "Counterfactual replay for agent swarms"
 requires-python = ">=3.12"

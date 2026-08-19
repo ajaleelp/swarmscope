@@ -2,7 +2,7 @@ output "service_bus_fully_qualified_namespace" {
   description = "Service Bus hostname used by passwordless application clients."
 
   value = trimsuffix(
-    trimprefix(azurerm_servicebus_namespace.hindsight.endpoint, "sb://"),
+    trimprefix(azurerm_servicebus_namespace.swarmscope.endpoint, "sb://"),
     "/"
   )
 }

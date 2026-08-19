@@ -19,7 +19,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await close_database()
 
 
-app = FastAPI(title="Hindsight Orders", lifespan=lifespan)
+app = FastAPI(title="Swarmscope Orders", lifespan=lifespan)
 
 
 @app.post(

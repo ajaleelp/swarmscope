@@ -1,23 +1,23 @@
 locals {
-  resource_group_name = "rg-hindsight-dev"
+  resource_group_name = "rg-swarmscope-dev"
 
   common_tags = {
-    application = "hindsight"
+    application = "swarmscope"
     environment = "development"
     managed_by  = "terraform"
   }
 }
 
-resource "azurerm_resource_group" "hindsight" {
+resource "azurerm_resource_group" "swarmscope" {
   name     = local.resource_group_name
   location = var.location
   tags     = local.common_tags
 }
 
-resource "azurerm_servicebus_namespace" "hindsight" {
+resource "azurerm_servicebus_namespace" "swarmscope" {
   name                = var.service_bus_namespace_name
-  location            = azurerm_resource_group.hindsight.location
-  resource_group_name = azurerm_resource_group.hindsight.name
+  location            = azurerm_resource_group.swarmscope.location
+  resource_group_name = azurerm_resource_group.swarmscope.name
   sku                 = "Standard"
 
   local_auth_enabled            = false
@@ -34,7 +34,7 @@ resource "azurerm_servicebus_namespace" "hindsight" {
 
 resource "azurerm_servicebus_topic" "orders" {
   name         = "orders"
-  namespace_id = azurerm_servicebus_namespace.hindsight.id
+  namespace_id = azurerm_servicebus_namespace.swarmscope.id
 
   requires_duplicate_detection            = true
   duplicate_detection_history_time_window = "PT10M"
