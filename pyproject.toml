@@ -5,6 +5,7 @@ description = "Counterfactual replay for agent swarms"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.16,<2",
+    "azure-core[aio]>=1.41,<2",
     "azure-identity>=1.19,<2",
     "azure-servicebus>=7.12,<8",
     "fastapi>=0.116,<1",
