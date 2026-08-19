@@ -4,6 +4,7 @@ from alembic import context
 from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import create_async_engine
 
+import apps.fulfilment.models  # noqa: F401  -- registers tables on the shared metadata
 from apps.orders.config import get_settings
 from apps.orders.models import Base
 

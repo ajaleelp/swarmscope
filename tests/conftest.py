@@ -1,12 +1,19 @@
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
 import psycopg
 import pytest
+import pytest_asyncio
 from alembic import command
 from alembic.config import Config
 from psycopg import sql
 from sqlalchemy import URL
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from apps.orders.config import Settings, get_settings
 
@@ -57,3 +64,47 @@ def prepared_test_database() -> Iterator[URL]:
     command.upgrade(config, "head")
 
     yield isolated.database_url
+
+
+@pytest_asyncio.fixture
+async def database_engine(
+    prepared_test_database: URL,
+) -> AsyncIterator[AsyncEngine]:
+    """Provide an engine bound to the isolated test database."""
+    engine = create_async_engine(prepared_test_database, pool_pre_ping=True)
+
+    try:
+        yield engine
+    finally:
+        await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def db_session(database_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
+    """Provide a test session whose changes never persist."""
+    async with database_engine.connect() as connection:
+        outer_transaction = await connection.begin()
+        session = AsyncSession(
+            bind=connection,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        )
+
+        try:
+            yield session
+        finally:
+            await session.close()
+            await outer_transaction.rollback()
+
+
+@pytest_asyncio.fixture
+async def committed_sessions(
+    database_engine: AsyncEngine,
+) -> async_sessionmaker[AsyncSession]:
+    """Provide sessions that really commit.
+
+    The outbox worker is only correct because it commits its claim before
+    contacting the broker, so it cannot be proven inside a transaction that is
+    always rolled back.
+    """
+    return async_sessionmaker(database_engine, expire_on_commit=False)

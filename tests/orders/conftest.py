@@ -3,61 +3,12 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest_asyncio
-from sqlalchemy import URL, text
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from apps.orders.models import Order, OutboxEvent
 
 SeedEvent = Callable[..., Awaitable[UUID]]
-
-
-@pytest_asyncio.fixture
-async def database_engine(
-    prepared_test_database: URL,
-) -> AsyncIterator[AsyncEngine]:
-    """Provide an engine bound to the isolated test database."""
-    engine = create_async_engine(prepared_test_database, pool_pre_ping=True)
-
-    try:
-        yield engine
-    finally:
-        await engine.dispose()
-
-
-@pytest_asyncio.fixture
-async def db_session(database_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
-    """Provide a test session whose changes never persist."""
-    async with database_engine.connect() as connection:
-        outer_transaction = await connection.begin()
-        session = AsyncSession(
-            bind=connection,
-            expire_on_commit=False,
-            join_transaction_mode="create_savepoint",
-        )
-
-        try:
-            yield session
-        finally:
-            await session.close()
-            await outer_transaction.rollback()
-
-
-@pytest_asyncio.fixture
-async def committed_sessions(
-    database_engine: AsyncEngine,
-) -> async_sessionmaker[AsyncSession]:
-    """Provide sessions that really commit.
-
-    The outbox worker is only correct because it commits its claim before
-    contacting the broker, so it cannot be proven inside a transaction that is
-    always rolled back.
-    """
-    return async_sessionmaker(database_engine, expire_on_commit=False)
 
 
 @pytest_asyncio.fixture
