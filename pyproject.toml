@@ -32,7 +32,7 @@ markers = [
     "spend: makes real model API calls",
     "cloud: requires real Azure resources",
 ]
-addopts = "-m 'not cluster and not spend and not cloud'"
+addopts = "-m 'not cluster and not spend and not cloud' --import-mode=importlib"
 
 [tool.ruff]
 line-length = 100
