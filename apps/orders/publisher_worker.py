@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import signal
 from dataclasses import dataclass
 from datetime import timedelta
 from uuid import UUID
@@ -12,6 +11,7 @@ from apps.orders.database import close_database, session_factory
 from apps.orders.messaging import EventPublisher
 from apps.orders.outbox import OutboxPublisher, PublishResult
 from apps.orders.servicebus import ServiceBusEventPublisher
+from packages.runtime import install_shutdown_handlers, sleep_unless_shutdown
 
 logger = logging.getLogger(__name__)
 
@@ -27,19 +27,6 @@ class LoopStats:
     failed: int = 0
     idle: int = 0
     errors: int = 0
-
-
-async def sleep_unless_shutdown(shutdown: asyncio.Event, delay: timedelta) -> None:
-    """Wait for the delay, but wake immediately if shutdown is requested.
-
-    A plain sleep would leave the process unresponsive to SIGTERM for up to a
-    full interval, which is long enough for Kubernetes to escalate to SIGKILL
-    in the middle of a send.
-    """
-    try:
-        await asyncio.wait_for(shutdown.wait(), timeout=delay.total_seconds())
-    except TimeoutError:
-        pass
 
 
 async def run_publisher_loop(
@@ -105,13 +92,6 @@ async def run_publisher_loop(
         await sleep_unless_shutdown(shutdown, idle_sleep)
 
     return stats
-
-
-def install_shutdown_handlers(shutdown: asyncio.Event) -> None:
-    """Translate termination signals into a shutdown request."""
-    loop = asyncio.get_running_loop()
-    for received in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(received, shutdown.set)
 
 
 async def main() -> None:

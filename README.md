@@ -97,7 +97,7 @@ semantics come first; the swarm and the tape follow.
 - [x] Service Bus publisher using Microsoft Entra identity
 - [x] Publisher process loop with graceful shutdown
 - [x] Fulfilment schema: processed events and idempotency guards
-- [ ] Fulfilment consumer with idempotent handling
+- [x] Fulfilment consumer with idempotent handling
 - [ ] Load generator with repeatable traffic
 - [ ] Fault catalogue with recorded ground truth
 

@@ -7,11 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from apps.orders.messaging import OutboundEvent
 from apps.orders.models import OutboxEvent
-from apps.orders.publisher_worker import (
-    LoopStats,
-    run_publisher_loop,
-    sleep_unless_shutdown,
-)
+from apps.orders.publisher_worker import LoopStats, run_publisher_loop
+from packages.runtime import sleep_unless_shutdown
 
 
 class ControllablePublisher:
