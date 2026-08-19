@@ -5,6 +5,8 @@ description = "Counterfactual replay for agent swarms"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.16,<2",
+    "azure-identity>=1.19,<2",
+    "azure-servicebus>=7.12,<8",
     "fastapi>=0.116,<1",
     "psycopg[binary]>=3.2,<4",
     "pydantic>=2.11,<3",
@@ -27,8 +29,9 @@ pythonpath = ["."]
 markers = [
     "cluster: requires a running local Kubernetes cluster",
     "spend: makes real model API calls",
+    "cloud: requires real Azure resources",
 ]
-addopts = "-m 'not cluster and not spend'"
+addopts = "-m 'not cluster and not spend and not cloud'"
 
 [tool.ruff]
 line-length = 100

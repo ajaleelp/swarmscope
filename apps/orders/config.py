@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     postgres_host: str = "127.0.0.1"
     postgres_port: int = 5432
 
+    service_bus_fully_qualified_namespace: str
+    service_bus_topic: str = "orders"
+    service_bus_subscription: str = "fulfilment"
+
     @property
     def database_url(self) -> URL:
         return URL.create(
