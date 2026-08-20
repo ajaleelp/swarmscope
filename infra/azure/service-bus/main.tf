@@ -62,3 +62,27 @@ resource "azurerm_role_assignment" "developer_receives_fulfilment" {
   principal_id         = var.developer_principal_id
   principal_type       = "User"
 }
+
+resource "azurerm_role_definition" "fault_runner" {
+  name        = "Swarmscope Service Bus Fault Runner"
+  scope       = azurerm_servicebus_namespace.swarmscope.id
+  description = "Read and update topic and subscription status for reversible faults."
+
+  permissions {
+    actions = [
+      "Microsoft.ServiceBus/namespaces/topics/read",
+      "Microsoft.ServiceBus/namespaces/topics/write",
+      "Microsoft.ServiceBus/namespaces/topics/subscriptions/read",
+      "Microsoft.ServiceBus/namespaces/topics/subscriptions/write",
+    ]
+  }
+
+  assignable_scopes = [azurerm_servicebus_namespace.swarmscope.id]
+}
+
+resource "azurerm_role_assignment" "developer_runs_faults" {
+  scope              = azurerm_servicebus_namespace.swarmscope.id
+  role_definition_id = azurerm_role_definition.fault_runner.role_definition_resource_id
+  principal_id       = var.developer_principal_id
+  principal_type     = "User"
+}

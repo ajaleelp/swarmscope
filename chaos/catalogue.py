@@ -142,9 +142,7 @@ class Fault(BaseModel):
             if status is not None and status != "Active":
                 key = (getattr(step, "topic", None), getattr(step, "subscription", None))
                 if key not in restored:
-                    raise ValueError(
-                        f"{self.id}: {key} is disabled but never set back to Active"
-                    )
+                    raise ValueError(f"{self.id}: {key} is disabled but never set back to Active")
             if step.action == "compose_stop" and step.service not in restarted:
                 raise ValueError(f"{self.id}: {step.service} is stopped but never started")
         return self

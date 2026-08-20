@@ -100,7 +100,7 @@ semantics come first; the swarm and the tape follow.
 - [x] Fulfilment consumer with idempotent handling
 - [x] Load generator with repeatable traffic
 - [x] Fault catalogue with recorded ground truth
-- [ ] Fault runner: inject, verify the symptom, revert
+- [x] Fault runner: inject, verify the symptom, revert
 
 **The swarm and the tape**
 - [ ] Read-only evidence tools

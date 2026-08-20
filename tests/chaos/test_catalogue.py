@@ -77,9 +77,7 @@ def test_the_public_view_carries_no_ground_truth() -> None:
 
 def test_a_symptom_that_names_its_cause_is_rejected() -> None:
     with pytest.raises(ValidationError, match="leaks"):
-        Fault.model_validate(
-            a_fault(symptom="The orders topic was disabled at 14:00.")
-        )
+        Fault.model_validate(a_fault(symptom="The orders topic was disabled at 14:00."))
 
 
 def test_no_shipped_symptom_names_its_own_cause() -> None:
@@ -107,8 +105,9 @@ def test_reveal_ground_truth_returns_the_answer_and_says_so(
 def test_a_disabled_entity_that_is_never_restored_is_rejected() -> None:
     with pytest.raises(ValidationError, match="never set back to Active"):
         Fault.model_validate(
-            a_fault(revert=[{"action": "topic_status", "topic": "orders",
-                             "status": "SendDisabled"}])
+            a_fault(
+                revert=[{"action": "topic_status", "topic": "orders", "status": "SendDisabled"}]
+            )
         )
 
 

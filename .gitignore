@@ -33,6 +33,7 @@ test-results/
 .env.local
 config/local.toml
 .cost-ledger.json
+.swarmscope-chaos-state.json
 
 # macOS
 .DS_Store
