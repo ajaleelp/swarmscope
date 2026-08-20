@@ -1,0 +1,46 @@
+id: subscription-receive-disabled
+title: Orders accepted but never fulfilled
+symptom: >-
+  Customers report orders sitting unconfirmed since about 14:10. The API is
+  returning 201 normally and checkout latency is unchanged. Nothing has restarted
+  and no deployment went out today.
+settle_seconds: 45
+
+inject:
+  - action: subscription_status
+    topic: orders
+    subscription: fulfilment
+    status: ReceiveDisabled
+
+revert:
+  - action: subscription_status
+    topic: orders
+    subscription: fulfilment
+    status: Active
+
+detects:
+  kind: sql
+  query: >-
+    SELECT count(*) FROM orders.orders o
+    LEFT JOIN fulfilment.fulfilments f ON f.order_id = o.id
+    WHERE f.id IS NULL AND o.created_at < now() - interval '30 seconds'
+  comparison: gt
+  threshold: 3
+  describe: orders older than 30 seconds with no fulfilment
+
+ground_truth:
+  summary: >-
+    The fulfilment subscription was set to ReceiveDisabled. The broker accepted
+    every published message and refused to hand any of them to the consumer.
+    Publishing is entirely healthy.
+  surface: broker-receive
+  evidence:
+    - every outbox row has published_at set and publish_attempts of 1
+    - the subscription's active message count climbs steadily
+    - the consumer logs no receives and no errors, because it is served nothing
+  forbidden_in_symptom:
+    - subscription
+    - receive
+    - broker
+    - service bus
+    - disabled

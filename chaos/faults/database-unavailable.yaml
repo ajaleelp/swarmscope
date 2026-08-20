@@ -1,0 +1,41 @@
+id: database-unavailable
+title: Checkout is failing outright
+symptom: >-
+  Every checkout has been returning an error since 14:22 and the error rate is
+  100 percent. Customers cannot place orders at all.
+settle_seconds: 20
+
+inject:
+  - action: compose_stop
+    service: postgres
+
+revert:
+  - action: compose_start
+    service: postgres
+
+detects:
+  kind: http
+  method: POST
+  path: /orders
+  body:
+    customer_id: chaos-probe
+    sku: SKU-0001
+    quantity: 1
+  status_at_least: 500
+  describe: placing an order returns a server error
+
+ground_truth:
+  summary: >-
+    PostgreSQL was stopped. The API cannot open a connection, so the order and
+    its outbox row cannot be written in one transaction and the request fails
+    before anything is accepted.
+  surface: database
+  evidence:
+    - the API returns 500 for every request rather than a subset
+    - no new rows appear in orders.orders at all
+    - the publisher and consumer both fail on their own connections
+  forbidden_in_symptom:
+    - postgres
+    - database
+    - connection
+    - stopped

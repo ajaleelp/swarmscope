@@ -1,0 +1,46 @@
+id: topic-send-disabled
+title: Orders accepted but never fulfilled
+symptom: >-
+  Customers report orders sitting unconfirmed since about 14:10. The API is
+  returning 201 normally and checkout latency is unchanged. Nothing has restarted
+  and no deployment went out today.
+settle_seconds: 45
+
+inject:
+  - action: topic_status
+    topic: orders
+    status: SendDisabled
+
+revert:
+  - action: topic_status
+    topic: orders
+    status: Active
+
+detects:
+  kind: sql
+  query: >-
+    SELECT count(*) FROM orders.outbox_events
+    WHERE published_at IS NULL AND publish_attempts > 1
+  comparison: gt
+  threshold: 2
+  describe: outbox events that have failed to publish more than once
+
+ground_truth:
+  summary: >-
+    The orders topic was set to SendDisabled. The publisher's sends are rejected,
+    so committed outbox rows never reach the broker and accumulate with rising
+    attempt counts. The consumer is healthy and simply has nothing to consume.
+  surface: broker-send
+  evidence:
+    - outbox rows have published_at null and publish_attempts climbing past one
+    - next_attempt_at moves further out as the backoff doubles
+    - last_publish_error names the rejected send
+    - the subscription's active message count stays at zero
+  forbidden_in_symptom:
+    - topic
+    - send
+    - publish
+    - broker
+    - service bus
+    - disabled
+    - outbox
