@@ -98,7 +98,7 @@ semantics come first; the swarm and the tape follow.
 - [x] Publisher process loop with graceful shutdown
 - [x] Fulfilment schema: processed events and idempotency guards
 - [x] Fulfilment consumer with idempotent handling
-- [ ] Load generator with repeatable traffic
+- [x] Load generator with repeatable traffic
 - [ ] Fault catalogue with recorded ground truth
 
 **The swarm and the tape**
