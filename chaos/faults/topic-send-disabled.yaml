@@ -20,10 +20,11 @@ detects:
   kind: sql
   query: >-
     SELECT count(*) FROM orders.outbox_events
-    WHERE published_at IS NULL AND publish_attempts > 1
+    WHERE published_at IS NULL
+      AND occurred_at < now() - interval '20 seconds'
   comparison: gt
-  threshold: 2
-  describe: outbox events that have failed to publish more than once
+  threshold: 5
+  describe: outbox events still unpublished twenty seconds after they were written
 
 ground_truth:
   summary: >-
@@ -32,9 +33,9 @@ ground_truth:
     attempt counts. The consumer is healthy and simply has nothing to consume.
   surface: broker-send
   evidence:
-    - outbox rows have published_at null and publish_attempts climbing past one
-    - next_attempt_at moves further out as the backoff doubles
+    - outbox rows accumulate unpublished while orders keep being accepted
     - last_publish_error names the rejected send
+    - next_attempt_at moves further out as the backoff doubles
     - the subscription's active message count stays at zero
   forbidden_in_symptom:
     - topic

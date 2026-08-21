@@ -10,6 +10,16 @@ from apps.orders.messaging import OutboundEvent
 
 CONTENT_TYPE = "application/json"
 
+# The outbox owns retry. It counts attempts, schedules the next one with
+# exponential backoff, and survives a crash. The SDK's own retry loop has none of
+# those properties, and because the publisher handles one event at a time an
+# in-SDK retry stalls the whole worker instead of failing a single event. The
+# defaults back off up to two minutes, which turns a rejected send into a
+# throughput collapse that hides the rejection. Fail fast and let the outbox
+# decide when to try again.
+SDK_RETRY_TOTAL = 1
+SDK_RETRY_BACKOFF_MAX_SECONDS = 2.0
+
 
 def to_service_bus_message(event: OutboundEvent) -> ServiceBusMessage:
     """Render one outbound event as a Service Bus message.
@@ -82,6 +92,8 @@ class ServiceBusEventPublisher:
         self._client = ServiceBusClient(
             fully_qualified_namespace=self._fully_qualified_namespace,
             credential=credential,
+            retry_total=SDK_RETRY_TOTAL,
+            retry_backoff_max=SDK_RETRY_BACKOFF_MAX_SECONDS,
         )
         self._sender = self._client.get_topic_sender(topic_name=self._topic_name)
         return self

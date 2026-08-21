@@ -49,6 +49,20 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _report_failure(prefix: str, error: BaseException) -> int:
+    """Print the failure and the notes describing what was left behind.
+
+    The runner records recovery outcomes with ``add_note``. An f-string never
+    renders ``__notes__``, so without this the one sentence saying whether the
+    environment was restored is silently discarded, which is the sentence an
+    operator most needs.
+    """
+    print(f"{prefix}: {type(error).__name__}: {error}", file=sys.stderr)
+    for note in getattr(error, "__notes__", ()):
+        print(f"  {note}", file=sys.stderr)
+    return 1
+
+
 def _unknown_fault(fault_id: str, catalogue: dict) -> int:
     print(f"unknown fault: {fault_id}", file=sys.stderr)
     print("known faults: " + ", ".join(sorted(catalogue)), file=sys.stderr)
@@ -110,8 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         except KeyboardInterrupt:
             return 130
         except Exception as error:
-            print(f"revert failed: {type(error).__name__}: {error}", file=sys.stderr)
-            return 1
+            return _report_failure("revert failed", error)
 
     if args.fault_id not in catalogue:
         return _unknown_fault(args.fault_id, catalogue)
@@ -137,8 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         return 130
     except Exception as error:
-        print(f"fault run failed: {type(error).__name__}: {error}", file=sys.stderr)
-        return 1
+        return _report_failure("fault run failed", error)
 
 
 if __name__ == "__main__":

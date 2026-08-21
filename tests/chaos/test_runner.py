@@ -338,3 +338,32 @@ def test_rendered_plan_never_contains_ground_truth(tmp_path: Path) -> None:
 
     assert fault.ground_truth.summary not in rendered
     assert "ground_truth" not in rendered
+
+
+def test_a_failed_run_prints_the_notes_that_say_what_was_left_behind(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The recovery outcome travels as a note and must reach the operator.
+
+    The runner attaches it with add_note. An f-string never renders __notes__,
+    so printing only str(error) discards the one sentence that says whether the
+    environment was restored or is still broken.
+    """
+
+    def failing_environment(**_):
+        error = RuntimeError("fault did not produce its declared symptom")
+        error.add_note("recovery is not verified; state retained: symptom remains present")
+        raise error
+
+    monkeypatch.setattr(chaos_cli, "production_environment", failing_environment)
+
+    exit_code = chaos_cli.main(
+        ["run", "topic-send-disabled", "--state-file", str(tmp_path / "state.json")]
+    )
+    reported = capsys.readouterr().err
+
+    assert exit_code == 1
+    assert "fault did not produce its declared symptom" in reported
+    assert "recovery is not verified; state retained" in reported

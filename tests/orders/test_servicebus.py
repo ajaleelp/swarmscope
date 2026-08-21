@@ -5,9 +5,12 @@ from uuid import uuid4
 
 import pytest
 
+import apps.orders.servicebus as servicebus_module
 from apps.orders.messaging import EventPublisher, OutboundEvent
 from apps.orders.servicebus import (
     CONTENT_TYPE,
+    SDK_RETRY_BACKOFF_MAX_SECONDS,
+    SDK_RETRY_TOTAL,
     ServiceBusEventPublisher,
     to_service_bus_message,
 )
@@ -103,6 +106,52 @@ async def test_publishing_before_opening_raises_rather_than_silently_failing() -
     )
     with pytest.raises(RuntimeError, match="not open"):
         await publisher.publish(sample_event())
+
+
+@pytest.mark.asyncio
+async def test_the_sdk_does_not_retry_underneath_the_outbox(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A rejected send must surface in seconds rather than after the SDK's backoff.
+
+    The outbox already retries, durably and with its attempts recorded. The SDK
+    retrying as well is a second, invisible loop, and because the publisher
+    handles one event at a time a long in-SDK retry stalls the whole worker
+    instead of failing the single event it belongs to. The SDK default backs off
+    up to two minutes, which turns a rejected send into a throughput collapse
+    that hides the rejection entirely.
+    """
+    recorded: dict[str, object] = {}
+
+    class RecordingSender:
+        async def close(self) -> None: ...
+
+    class RecordingClient:
+        def __init__(self, **kwargs: object) -> None:
+            recorded.update(kwargs)
+
+        def get_topic_sender(self, topic_name: str) -> RecordingSender:
+            return RecordingSender()
+
+        async def close(self) -> None: ...
+
+    class StubCredential:
+        async def close(self) -> None: ...
+
+    monkeypatch.setattr(servicebus_module, "ServiceBusClient", RecordingClient)
+
+    async with ServiceBusEventPublisher(
+        fully_qualified_namespace="example.servicebus.windows.net",
+        topic_name="orders",
+        credential=StubCredential(),
+    ):
+        pass
+
+    assert recorded["retry_total"] == SDK_RETRY_TOTAL
+    assert recorded["retry_backoff_max"] == SDK_RETRY_BACKOFF_MAX_SECONDS
+    assert SDK_RETRY_BACKOFF_MAX_SECONDS <= 5, (
+        "a rejected send must hand back to the outbox quickly"
+    )
 
 
 # --- against real Azure: excluded by default --------------------------------
