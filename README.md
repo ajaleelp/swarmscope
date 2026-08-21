@@ -188,3 +188,7 @@ the rest roll back.
 | `infra/local/` | Local PostgreSQL initialisation |
 | `docs/mockup/` | Interactive mockup of the investigation interface |
 | `tests/` | Test suite |
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
