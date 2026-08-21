@@ -14,6 +14,7 @@ from apps.fulfilment.service import fulfil_order
 from apps.orders.config import get_settings
 from apps.orders.database import close_database, session_factory
 from packages.contracts.order_placed import OrderPlacedV1
+from packages.observability import configure_logging
 from packages.runtime import install_shutdown_handlers, sleep_unless_shutdown
 
 logger = logging.getLogger(__name__)
@@ -184,10 +185,7 @@ async def run_consumer_loop(
 
 async def main() -> None:
     """Consume the fulfilment subscription until told to stop."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
+    configure_logging()
     settings = get_settings()
     shutdown = asyncio.Event()
     install_shutdown_handlers(shutdown)

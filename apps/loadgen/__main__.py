@@ -6,6 +6,7 @@ from datetime import timedelta
 import httpx
 
 from apps.loadgen.generator import DEFAULT_RATE_PER_SECOND, HttpOrderSender, run_load
+from packages.observability import configure_logging
 from packages.runtime import install_shutdown_handlers
 
 logger = logging.getLogger("apps.loadgen")
@@ -31,7 +32,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 async def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    configure_logging()
 
     shutdown = asyncio.Event()
     install_shutdown_handlers(shutdown)

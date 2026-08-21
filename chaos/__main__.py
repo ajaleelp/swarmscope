@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-import logging
 import sys
 from pathlib import Path
 
@@ -8,6 +7,7 @@ from chaos.catalogue import load_catalogue, symptoms
 from chaos.environment import DEFAULT_API_BASE_URL, production_environment
 from chaos.runner import FaultRunner, FaultRunResult, RunStatus, render_plan
 from chaos.state import DEFAULT_STATE_PATH, FaultStateError, FaultStateStore
+from packages.observability import configure_logging
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -70,6 +70,15 @@ def _unknown_fault(fault_id: str, catalogue: dict) -> int:
 
 
 def _report(result: FaultRunResult) -> int:
+    if result.injected is not None:
+        # How strongly the symptom presented is the run's most useful number. A
+        # count barely over the threshold and one many times past it are equally
+        # a pass, and only one of them is worth trusting.
+        print(
+            f"{result.fault_id}: symptom detected "
+            f"({result.injected.description}: {result.injected.observed})"
+        )
+
     observation = result.recovery.observation
     observed = observation.observed if observation is not None else "unavailable"
     if result.status is RunStatus.RECOVERED:
@@ -116,10 +125,7 @@ def main(argv: list[str] | None = None) -> int:
             fault = catalogue.get(state.fault_id)
             if fault is None:
                 return _unknown_fault(state.fault_id, catalogue)
-            logging.basicConfig(
-                level=logging.INFO,
-                format="%(asctime)s %(levelname)s %(name)s %(message)s",
-            )
+            configure_logging()
             return asyncio.run(_revert_live(args, fault))
         except KeyboardInterrupt:
             return 130
@@ -141,10 +147,7 @@ def main(argv: list[str] | None = None) -> int:
         print(render_plan(fault, args.state_file), end="")
         return 0
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
+    configure_logging()
     try:
         return asyncio.run(_run_live(args, fault))
     except KeyboardInterrupt:

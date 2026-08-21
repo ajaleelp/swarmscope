@@ -11,6 +11,7 @@ from apps.orders.database import close_database, session_factory
 from apps.orders.messaging import EventPublisher
 from apps.orders.outbox import OutboxPublisher, PublishResult
 from apps.orders.servicebus import ServiceBusEventPublisher
+from packages.observability import configure_logging
 from packages.runtime import install_shutdown_handlers, sleep_unless_shutdown
 
 logger = logging.getLogger(__name__)
@@ -102,10 +103,7 @@ async def main() -> None:
     keeps failing and the process must be restarted. A liveness probe is the
     intended answer once this runs under Kubernetes.
     """
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
+    configure_logging()
     settings = get_settings()
     shutdown = asyncio.Event()
     install_shutdown_handlers(shutdown)

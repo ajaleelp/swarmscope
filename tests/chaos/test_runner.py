@@ -10,7 +10,9 @@ from chaos.catalogue import Check, Fault, Step, load_catalogue
 from chaos.environment import DetectionResult
 from chaos.runner import (
     FaultRunner,
+    FaultRunResult,
     InjectionNotDetected,
+    RecoveryReport,
     RecoveryRequired,
     RevertFailed,
     RunStatus,
@@ -367,3 +369,34 @@ def test_a_failed_run_prints_the_notes_that_say_what_was_left_behind(
     assert exit_code == 1
     assert "fault did not produce its declared symptom" in reported
     assert "recovery is not verified; state retained" in reported
+
+
+def test_a_successful_run_reports_how_strongly_the_symptom_presented(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A pass that barely cleared the threshold is not the same as a clear one.
+
+    The runner captures the injection observation and reporting only the
+    recovery reading discards it, leaving every successful run looking alike.
+    """
+    fault = load_catalogue()["topic-send-disabled"]
+    result = FaultRunResult(
+        fault_id=fault.id,
+        status=RunStatus.RECOVERED,
+        injected=DetectionResult(
+            matched=True, observed=137, description=fault.detects.describe
+        ),
+        recovery=RecoveryReport(
+            observation=DetectionResult(
+                matched=False, observed=0, description=fault.detects.describe
+            )
+        ),
+    )
+
+    exit_code = chaos_cli._report(result)
+    reported = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "137" in reported
+    assert "reverted and healthy" in reported
